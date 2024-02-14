@@ -1,0 +1,175 @@
+---
+title: "Project 2"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+
+
+##### For Project 2 I will be testing a data set I created in a previous computer science class. I gathered this information from Pokemon website and extracted the information into a csv file on Excel. After cleaning and removing less relevant data and unecessary characters I was still left with a few NAs but I will be removing them here in R leaving plenty of data to use. My dataset is information about all Pokemon that have been released up to ~2020.
+  
+
+```{r}
+library(tidyr)
+library(readr)
+library(mosaic)
+library(yarrr)
+```
+
+```{r}
+poke <- Pokemon %>% na.omit()
+poke 
+```
+
+*I would like to observe the two quantitative columns: HP and Attack. HP (response variable) describes the health points that each named Pokemon start at and Attack (explanatory variable) is there according attack power. I find it very interesting that from the looks of our plots there is somewhat of a linear relationship that may be happening here!*
+
+```{r}
+pirateplot(Attack ~ HP, data = poke)
+```
+```{r}
+ggplot() + geom_point( mapping = aes(x = Attack, y = HP ), data = poke, color = 'blue', size = 2 )
+```
+The four Assumptions for Linear Regression
+
+1. First we consider the Normality Assumption. Given the plot above we can see that there is a normal distribution of data points on the plot. 
+
+2. Next we can consider the Constant Variance Assumption. There are few outliers and the span has consistent variety throughout (as seen in pirate plot).
+
+3. (The Independence Assumption) My y and x quantitative variables I am using are indeed independent and do not rely on each other. HP is a response variable to the Pokemon and Attack is a explanatory variable of the pokemon.
+
+4. There are no points in the data that are more valuable or influential than the other points thus the model for the mean is correct. We are only looking at one group and that is pokemon. 
+
+```{r}
+lm_poke <- lm( HP ~ Attack, data = poke)
+plot(lm_poke)
+```
+```{r}
+summary(lm_poke)
+```
+- H0 (Null Hypothesis):  The slope m is 0. There is no LINEAR effect of the level of Attack on describing the HP of any given pokemon.
+
+- HA (Alternative Hypothesis): The slope m > 0.  I.e. There is a non-constant linear relationship between level of Attack and HP of pokemon.
+
+**Our summary shows us that there is no linear effect happening because our R-Squared value is 0.2691 which is not close to one and that does not represent a strong linear model.** 
+
+
+**ANOVA**
+I am going to conduct first a simple ANOVA (one way) test then a two way to gather more information about our data set.
+Assumptions:
+
+- Independence comes from the experiment and in this case the important notation is that each pokemon is different and there are no multiples.
+
+- Constant Variance works for this data set because all pokemon stats are relatively in the same ball park.
+
+I need an explanatory variable with two or more values. I will make an interaction between type and speed of pokemon.
+```{r}
+summary(poke$Speed)
+```
+
+```{r}
+tally(poke$`Type 1`)
+```
+
+```{r}
+poke_test <- poke %>% mutate(TypesSpeed = interaction(poke$`Type 1`, Speed)) 
+```
+
+```{r}
+summary(poke_test$TypesSpeed)
+```
+```{r}
+lm_1 <- lm( HP ~ TypesSpeed , data = poke_test) #test
+anova(lm_1)
+```
+- H0 (Null Hypothesis): The TypesSpeed interaction in our data set is significant to the HP of the pokemon.
+
+- HA (Alternative Hypothesis): TypesSpeed interaction is not significant to the HP of the pokemon.
+
+  *Our one way ANOVA test shows that there is a p value of 0.04723, we want 95% accuracy,this is just enough to accept the null hypothesis. The Types and Speed of the pokemon are significant to the HP of the pokemon, however, we don't know in which ways it is significant but we can see that it makes a significant difference.* 
+  
+**Parametric Version:**
+```{r}
+Tobs_2 <- anova(lm_1)
+Tobs_2
+```
+```{r}
+Tobs_2[1,4]
+```
+
+```{r}
+N <- 1000
+Tstar <- matrix(NA, nrow = N)
+for (b in (1:N)){
+  Tstar[b] <- anova(lm(HP ~ shuffle(TypesSpeed), data=poke_test))[1,4]
+}
+```
+
+
+```{r}
+tibble(Tstar) %>% ggplot(aes(x = Tstar)) + 
+  geom_histogram(aes(y = ..ncount..), bins=25, col=1, fill='darkgreen') 
+```
+*Most of our results from this test get around 1.288894, as seen in our anova test. We also get a nice bell curve, indicating that there is significance.*
+
+
+
+**Prediction and Confidence Intervals: (for HP and Attack):**
+```{r}
+N <- 1000
+S <- 50
+Rstar_poke <- matrix(NA, nrow = N)
+for (b in 1:N){
+  dfs <- sample(poke, size = S, replace = TRUE)
+  lm_t <- lm(HP ~ Attack, data = dfs)
+  Rstar_poke[b] = rsquared(lm_t)
+}
+```
+```{r}
+tibble(Rstar_poke) %>% ggplot(aes(x=Rstar_poke)) + geom_histogram(aes( y = after_stat(ncount)), bins=20, col=1, fill='skyblue' ) +
+   geom_vline(xintercept = quantile(Rstar_poke, c(0.05, 0.95)), col="red", lwd=2)
+```
+```{r}
+qdata(Rstar_poke, c(0.05, 0.95))
+```
+
+
+
+**Prediction and Confidence Intervals: (for HP and Defense):**
+```{r}
+N <- 1000
+S <- 50
+Rstar_poke2 <- matrix(NA, nrow = N)
+for (b in 1:N){
+  dfs2 <- sample(poke, size = S, replace = TRUE)
+  lm_t2 <- lm(HP ~ Defense, data = dfs2)
+  Rstar_poke2[b] = rsquared(lm_t2)
+}
+```
+```{r}
+tibble(Rstar_poke2) %>% ggplot(aes(x=Rstar_poke2)) + geom_histogram(aes( y = after_stat(ncount)), bins=20, col=1, fill='skyblue' ) +
+   geom_vline(xintercept = quantile(Rstar_poke2, c(0.05, 0.95)), col="red", lwd=2)
+```
+```{r}
+qdata(Rstar_poke2, c(0.05, 0.95))
+```
+
+
+
+**Prediction and Confidence Intervals: (for HP and Speed):**
+```{r}
+N <- 1000
+S <- 50
+Rstar_poke3 <- matrix(NA, nrow = N)
+for (b in 1:N){
+  dfs3 <- sample(poke, size = S, replace = TRUE)
+  lm_t3 <- lm(HP ~ Speed, data = dfs3)
+  Rstar_poke3[b] = rsquared(lm_t3)
+}
+```
+```{r}
+tibble(Rstar_poke3) %>% ggplot(aes(x=Rstar_poke3)) + geom_histogram(aes( y = after_stat(ncount)), bins=20, col=1, fill='skyblue' ) +
+   geom_vline(xintercept = quantile(Rstar_poke3, c(0.05, 0.95)), col="red", lwd=2)
+```
+```{r}
+qdata(Rstar_poke2, c(0.05, 0.95))
+```
